@@ -1,0 +1,300 @@
+--Select all orders 
+SELECT * 
+FROM Sales_table; 
+
+--delivered orders 
+SELECT ordernumber, orderdate, deliverydate FROM Sales_table
+WHERE deliverydate IS NOT NULL;
+ 
+--cancelled/ Not delivered orders 
+SELECT ordernumber, orderdate, deliverydate FROM Sales_table
+WHERE deliverydate IS NULL;
+--Find total revenue 
+SELECT s.ProductKey,
+       s.Quantity,
+       p.Unit_Price_USD,
+       (s.Quantity * p.Unit_Price_USD) AS Revenue
+FROM Sales_table s
+INNER JOIN Products_table p
+    ON s.ProductKey = p.ProductKey
+    Commit;
+-- added as column   
+SELECT s.ProductKey,
+       s.Quantity,
+       TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', '')) AS Unit_Price,
+       (s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) AS Revenue
+FROM Sales_table s
+INNER JOIN Products_table p
+    ON s.ProductKey = p.ProductKey;
+    
+--orders above ₹10,000
+desc Sales_table
+desc Products_table
+
+ALTER TABLE Products_table ADD Unit_Price_USD NUMBER(10,2);
+
+UPDATE Products_table
+SET Unit_Price_USD = TO_NUMBER(
+    REPLACE(REPLACE(UNIT_PRICE_USD, '$', ''), ',', '')
+)
+WHERE REGEXP_LIKE(UNIT_PRICE_USD, '^[\$0-9,\.]+$');
+
+SELECT *
+FROM Products_table
+WHERE Unit_Price_USD >= 100;
+
+--total profit 
+SELECT p.ProductKey,
+       SUM(
+         TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))
+       - TO_NUMBER(REPLACE(REPLACE(p.Unit_Cost_USD, '$', ''), ',', ''))
+       ) AS Profit
+FROM Products_table_table p
+WHERE REGEXP_LIKE(p.Unit_Price_USD, '^[\$0-9,\.]+$')
+  AND REGEXP_LIKE(p.Unit_Cost_USD, '^[\$0-9,\.]+$')
+GROUP BY p.ProductKey;
+
+--total orders 
+SELECT COUNT(OrderNumber) AS Total_Orders
+FROM Sales_table;
+
+--average order value 
+desc sales_table
+desc products_table
+
+SELECT P.Product_Name,
+       TO_CHAR(
+         SUM(S.Quantity * TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', '')))
+         / COUNT(S.Order_Number),
+         'FM9999990.00'
+       ) AS Average_Order_Value
+FROM Sales_table S
+JOIN Products_table P
+    ON S.ProductKey = P.ProductKey
+GROUP BY P.Product_Name;
+
+--Revenue by category 
+SELECT p.Category,
+       SUM(s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) AS Revenue_by_Category
+FROM Sales_table s
+INNER JOIN Products_table p
+    ON s.ProductKey = p.ProductKey
+GROUP BY p.Category;
+
+--Profit by category 
+SELECT p.Category,
+       SUM(
+         TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))
+       - TO_NUMBER(REPLACE(REPLACE(p.Unit_Cost_USD, '$', ''), ',', ''))
+       ) AS Profit
+FROM products_table p
+WHERE REGEXP_LIKE(p.Unit_Price_USD, '^[\$0-9,\.]+$')
+  AND REGEXP_LIKE(p.Unit_Cost_USD, '^[\$0-9,\.]+$')
+GROUP BY p.Category;
+--Revenue by state 
+desc customers_table
+desc sales_table
+SELECT C.State, p.Category,
+       SUM(s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) AS Revenue_by_State
+FROM Sales_table s
+INNER JOIN Products_table p
+    ON s.ProductKey = p.ProductKey
+INNER JOIN Customers_table C
+    ON s.CustomerKey = C.CustomerKey   
+GROUP BY C.State, P.Category
+ORDER BY C.State, P.Category;
+--Revenue by month 
+SELECT TO_CHAR(s.order_date, 'YYYY-MM') AS Month,
+       p.Category,
+       SUM(s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) AS Revenue_by_Month
+FROM Sales_table s
+INNER JOIN Products_table p
+    ON s.ProductKey = p.ProductKey
+GROUP BY TO_CHAR(s.order_date, 'YYYY-MM'), p.Category
+ORDER BY Month, p.Category;
+
+--Top 10 products by revenue 
+SELECT * FROM (
+SELECT p.Product_Name,
+       SUM(s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) AS Top_Revenue
+FROM Sales_table s
+INNER JOIN Products_table p
+    ON s.ProductKey = p.ProductKey
+GROUP BY p.Product_Name
+ORDER BY Top_Revenue DESC)
+WHERE ROWNUM <=10;
+
+--Top 10 customers by revenue 
+SELECT * FROM (
+SELECT C.Name,
+       SUM(s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) AS Top_Revenue
+FROM Sales_table s
+INNER JOIN Products_table p
+    ON s.ProductKey = p.ProductKey
+INNER JOIN Customers_table C
+    ON s.CustomerKey = C.CustomerKey    
+GROUP BY C.Name
+ORDER BY Top_Revenue DESC)
+WHERE ROWNUM <=10;
+
+--Average delivery time by state 
+SELECT S.CustomerKey,
+       TO_CHAR(
+       AVG(S.Delivery_Date - S.Order_Date), 
+       'FM9999990.00') AS Avg_Delivery_Time
+FROM Sales_table S
+WHERE S.Delivery_Date IS NOT NULL
+GROUP BY S.CustomerKey;
+
+--Find customers who placed more than 5 orders
+SELECT S.CustomerKey,
+       COUNT(S.Order_Number) AS Total_Orders
+FROM Sales_table S
+GROUP BY S.CustomerKey
+HAVING COUNT(S.Order_Number) > 5
+ORDER BY Total_Orders DESC;
+
+--Join Customers + Orders : Customer_Name, City, State, Order_ID, Revenue 
+SELECT C.Name,
+       C.City,
+       C.State,
+       S.Order_Number,
+       (S.Quantity * TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', ''))) AS Revenue
+FROM Sales_table S
+INNER JOIN Products_table P
+    ON S.ProductKey = P.ProductKey
+INNER JOIN Customers_table C
+    ON S.CustomerKey = C.CustomerKey
+ORDER BY C.Name, S.Order_Number;
+
+--Join Products + Orders. Find: Product, Category, Quantity, Revenue, Profit
+SELECT P.Product_name,
+       P.Category,
+       S.Quantity,
+       S.Order_Number,
+       (S.Quantity * TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', ''))) AS Revenue,
+       (TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', '')) - TO_NUMBER(REPLACE(REPLACE(P.Unit_Cost_USD, '$', ''), ',', ''))) AS Profit
+FROM Sales_table S
+INNER JOIN Products_table P
+    ON S.ProductKey = P.ProductKey
+ORDER BY P.Product_name, S.Order_Number;
+
+--Top 3 products in every category
+SELECT Category,
+       Product_Name,
+       Total_Revenue
+FROM (
+    SELECT p.Category,
+           p.Product_Name,
+           SUM(s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) AS Total_Revenue,
+           RANK() OVER (PARTITION BY p.Category ORDER BY SUM(s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) DESC) AS Revenue_Rank
+    FROM Sales_table s
+    INNER JOIN Products_table p
+        ON s.ProductKey = p.ProductKey
+    GROUP BY p.Category, p.Product_Name
+)
+WHERE Revenue_Rank <= 3
+ORDER BY Category, Revenue_Rank;
+
+--Top 5 customers in every state 
+SELECT State,
+       Name AS Customer_Name,
+       Total_Revenue
+FROM (
+    SELECT C.State,
+           C.Name,
+           SUM(S.Quantity * TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', ''))) AS Total_Revenue,
+           RANK() OVER (
+               PARTITION BY C.State
+               ORDER BY SUM(S.Quantity * TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', ''))) DESC
+           ) AS Customer_Revenue_Rank
+    FROM Sales_table S
+    INNER JOIN Products_table P
+        ON S.ProductKey = P.ProductKey
+    INNER JOIN Customers_table C
+        ON S.CustomerKey = C.CustomerKey
+    GROUP BY C.State, C.Name
+)
+WHERE Customer_Revenue_Rank <= 5
+ORDER BY State, Customer_Revenue_Rank;
+
+--Month-over-month revenue growth 
+WITH Monthly_Revenue AS (
+    SELECT TO_CHAR(s.Order_Date, 'YYYY-MM') AS Month,
+           SUM(s.Quantity * TO_NUMBER(REPLACE(REPLACE(p.Unit_Price_USD, '$', ''), ',', ''))) AS Revenue
+    FROM Sales_table s
+    INNER JOIN Products_table p
+        ON s.ProductKey = p.ProductKey
+    GROUP BY TO_CHAR(s.Order_Date, 'YYYY-MM')
+)
+SELECT Month,
+       Revenue,
+       LAG(Revenue) OVER (ORDER BY Month) AS Prev_Month_Revenue,
+       ROUND(((Revenue - LAG(Revenue) OVER (ORDER BY Month)) 
+              / LAG(Revenue) OVER (ORDER BY Month)) * 100, 2) AS MoM_Growth_Percent
+FROM Monthly_Revenue
+ORDER BY Month;
+
+--Find repeat customers 
+SELECT C.CustomerKey,
+       C.Name AS Customer_Name,
+       COUNT(S.Order_Number) AS Total_Orders
+FROM Sales_table S
+INNER JOIN Customers_table C
+    ON S.CustomerKey = C.CustomerKey
+GROUP BY C.CustomerKey, C.Name
+HAVING COUNT(S.Order_Number) > 1
+ORDER BY Total_Orders DESC;
+
+--Find customers who haven't purchased recently. Define a suitable period such as 90 days.
+SELECT C.CustomerKey,
+       C.Name AS Customer_Name,
+       MAX(S.Order_Date) AS Last_Purchase_Date
+FROM Sales_table S
+INNER JOIN Customers_table C
+    ON S.CustomerKey = C.CustomerKey
+GROUP BY C.CustomerKey, C.Name
+HAVING MAX(S.Order_Date) < SYSDATE - 90
+ORDER BY Last_Purchase_Date;
+
+--Customer lifetime value
+SELECT Customer_Name,
+       Total_Revenue,
+       RANK() OVER (ORDER BY Total_Revenue DESC) AS Revenue_Rank
+FROM (
+    SELECT C.Name AS Customer_Name,
+           SUM(S.Quantity * TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', ''))) AS Total_Revenue
+    FROM Sales_table S
+    INNER JOIN Products_table P
+        ON S.ProductKey = P.ProductKey
+    INNER JOIN Customers_table C
+        ON S.CustomerKey = C.CustomerKey
+    GROUP BY C.Name
+)
+ORDER BY Revenue_Rank;
+
+--Find profitable vs unprofitable products 
+WITH Product_Profit AS (
+    SELECT P.Product_Name,
+           P.Category,
+           SUM(S.Quantity * TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', ''))) AS Revenue,
+           SUM(S.Quantity * (TO_NUMBER(REPLACE(REPLACE(P.Unit_Price_USD, '$', ''), ',', ''))
+                            - TO_NUMBER(REPLACE(REPLACE(P.Unit_Cost_USD, '$', ''), ',', '')))) AS Profit
+    FROM Sales_table S
+    INNER JOIN Products_table P
+        ON S.ProductKey = P.ProductKey
+    GROUP BY P.Product_Name, P.Category
+)
+SELECT Product_Name,
+       Category,
+       Revenue,
+       Profit,
+       ROUND((Profit / Revenue) * 100, 2) AS Profit_Percent,
+       CASE
+         WHEN (Profit / Revenue) * 100 > 20 THEN 'Highly Profitable'
+         WHEN (Profit / Revenue) * 100 BETWEEN 10 AND 20 THEN 'Profitable'
+         WHEN (Profit / Revenue) * 100 BETWEEN 0 AND 10 THEN 'Low Profit'
+         ELSE 'Loss'
+       END AS Profit_Category
+FROM Product_Profit
+ORDER BY Profit_Percent DESC;
